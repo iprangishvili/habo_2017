@@ -20,9 +20,11 @@ body {
 }
 
 #hypothesisDiv{
-  position: absolute;
+  position: fixed;
   top: 40%;
   left:45%;
+  -webkit-transform: translate(-50%, -50%);
+  transform: translate(-50%, -50%);
   color: white !important;
   font-weight: lighter;
   font-family: sans-serif;
