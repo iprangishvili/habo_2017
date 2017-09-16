@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<!-- <html ng-app="BlankApp"> -->
+<html>
+<head>
+    <title>Speech Sample</title>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="styles.css">
+    <!-- <link rel="stylesheet" href="https://ajax.googleapis.com/ajax/libs/angular_material/1.1.0/angular-material.min.css"> -->
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons"rel="stylesheet">
+</head>
+<!-- <body ng-controller="mainCtrl"> -->
+<body>
+  <md-conent>
+    <!-- <div style="visibility: hidden;">
+        <td align="right"><a href="https://www.microsoft.com/cognitive-services/en-us/sign-up" target="_blank">Subscription</a>:</td>
+        <td><input id="key" type="text" size="40" value="6565be15445d468fa8d2a51fc225ef63"></td>
+    </div> -->
+      <h2 id="hypothesisDiv"></h2>
+    <!-- <div id="center-middle"> -->
+      <div id="startBtn" md-ink-ripple="#FF0000" aria-label="voice" class="md-fab md-accent md-hue-1">
+        <i class="material-icons">mic</i>
+      </div>
+    <!-- </div> -->
+  </md-conent>
+    <!-- The SDK has a dependency on requirejs (http://requirejs.org/). -->
+    <script src="//cdnjs.cloudflare.com/ajax/libs/require.js/2.3.3/require.min.js"></script>
+    <!-- SDK REFERENCE -->
+    <script src="speech.browser.sdk.js"></script>
+   <!-- SDK USAGE -->
+   <script>
+       // On doument load resolve the SDK dependecy
+       function Initialize(onComplete) {
+           require(["Speech.Browser.Sdk"], function(SDK) {
+               onComplete(SDK);
+           });
+       }
+       // Setup the recongizer
+       function RecognizerSetup(SDK, recognitionMode, language, format, subscriptionKey) {
+           var recognizerConfig = new SDK.RecognizerConfig(
+               new SDK.SpeechConfig(
+                   new SDK.Context(
+                       new SDK.OS(navigator.userAgent, "Browser", null),
+                       new SDK.Device("SpeechSample", "SpeechSample", "1.0.00000"))),
+               recognitionMode, // SDK.RecognitionMode.Interactive  (Options - Interactive/Conversation/Dictation>)
+               language, // Supported laguages are specific to each recognition mode. Refer to docs.
+               format); // SDK.SpeechResultFormat.Simple (Options - Simple/Detailed)
+
+           // Alternatively use SDK.CognitiveTokenAuthentication(fetchCallback, fetchOnExpiryCallback) for token auth
+           var authentication = new SDK.CognitiveSubscriptionKeyAuthentication(subscriptionKey);
+
+           return SDK.CreateRecognizer(recognizerConfig, authentication);
+       }
+
+       // Start the recognition
+       function RecognizerStart(SDK, recognizer) {
+           recognizer.Recognize((event) => {
+               /*
+                Alternative syntax for typescript devs.
+                if (event instanceof SDK.RecognitionTriggeredEvent)
+               */
+               switch (event.Name) {
+                   case "RecognitionTriggeredEvent" :
+                       UpdateStatus("Initializing");
+                       break;
+                   case "ListeningStartedEvent" :
+                       UpdateStatus("Listening");
+                       break;
+                   case "RecognitionStartedEvent" :
+                       UpdateStatus("Listening_Recognizing");
+                       break;
+                   case "SpeechStartDetectedEvent" :
+                       UpdateStatus("Listening_DetectedSpeech_Recognizing");
+                       console.log(JSON.stringify(event.Result)); // check console for other information in result
+                       break;
+                   case "SpeechHypothesisEvent" :
+                       UpdateRecognizedHypothesis(event.Result.Text);
+                       console.log(JSON.stringify(event.Result)); // check console for other information in result
+                       break;
+                   case "SpeechEndDetectedEvent" :
+                       OnSpeechEndDetected();
+                       UpdateStatus("Processing_Adding_Final_Touches");
+                       console.log(JSON.stringify(event.Result)); // check console for other information in result
+                       break;
+                   case "SpeechSimplePhraseEvent" :
+                       UpdateRecognizedPhrase(JSON.stringify(event.Result, null, 3));
+                       break;
+                   case "SpeechDetailedPhraseEvent" :
+                       UpdateRecognizedPhrase(JSON.stringify(event.Result, null, 3));
+                       break;
+                   case "RecognitionEndedEvent" :
+                       OnComplete();
+                       UpdateStatus("Idle");
+                       console.log(JSON.stringify(event)); // Debug information
+                       break;
+               }
+           })
+           .On(() => {
+               // The request succeeded. Nothing to do here.
+           },
+           (error) => {
+               console.error(error);
+           });
+       }
+
+       // Stop the Recognition.
+       function RecognizerStop(SDK, recognizer) {
+           // recognizer.AudioSource.Detach(audioNodeId) can be also used here. (audioNodeId is part of ListeningStartedEvent)
+           recognizer.AudioSource.TurnOff();
+       }
+   </script>
+   <!-- Angular Material requires Angular.js Libraries -->
+   <!-- <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.5.5/angular.min.js"></script>
+   <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.5.5/angular-animate.min.js"></script>
+   <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.5.5/angular-aria.min.js"></script>
+   <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.5.5/angular-messages.min.js"></script> -->
+   <!-- Angular Material Library -->
+   <!-- <script src="https://ajax.googleapis.com/ajax/libs/angular_material/1.1.0/angular-material.min.js"></script> -->
+   <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+    <script>
+    // angular.module('BlankApp', ['ngMaterial']).controller("mainCtrl", function($scope){
+    var hypothesis_space;
+    $(document).ready(function(){
+      hypothesis_space = $("#hypothesisDiv")
+      var SDK;
+      var recognizer;
+      var listening = false
+      Initialize(function (speechSdk) {
+        SDK = speechSdk;
+      });
+      var record_button = function(){
+        if (!recognizer){
+          Setup();
+        }
+        if (listening == false){
+          listening = true;
+          RecognizerStart(SDK, recognizer);
+        }
+        else{
+          // stop pre-emptively
+          listening = false;
+          RecognizerStop(SDK);
+        }
+      };
+      function Setup() {
+        recognizer = RecognizerSetup(SDK, SDK.RecognitionMode.Interactive, "en-US", SDK.SpeechResultFormat["simple"], "6565be15445d468fa8d2a51fc225ef63");
+      }
+
+        $("#startBtn").click(function(){
+          record_button()
+          $("#startBtn").toggleClass("pulse")
+        })
+    });
+    function UpdateStatus(status) {
+          // alert("status update")
+          // statusDiv.innerHTML = status;
+      }
+
+      function UpdateRecognizedHypothesis(text) {
+        // alert("hypothesis update")
+        hypothesis_space.text(text)
+      }
+
+      function OnSpeechEndDetected() {
+        listening = false
+        $("#startBtn").removeClass("pulse")
+          // stopBtn.disabled = true;
+      }
+
+      function UpdateRecognizedPhrase(json) {
+          // alert("update recognized phrase")
+          //  phraseDiv.innerHTML = json;
+          $.ajax('/command',{
+            type: 'POST',
+            data: json,
+            contentType: "application/json"
+          });
+          // $.post('/command', {data: json})
+      }
+
+      function OnComplete() {
+        listening = false
+      }
+
+    </script>
+</body>
+</html>
